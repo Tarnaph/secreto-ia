@@ -68,6 +68,7 @@ const ScriptView: React.FC<ScriptViewProps> = ({ onGenerate, isProcessing, setPr
     const [manualText, setManualText] = useState('');
     const [duration, setDuration] = useState<number>(1);
     const [pace, setPace] = useState<Pace>('normal');
+    const [manualTargetDuration, setManualTargetDuration] = useState<number>(8);
     const [useFixedStyle, setUseFixedStyle] = useState(true);
     const [includeVideoPrompts, setIncludeVideoPrompts] = useState(true);
     const [srtFile, setSrtFile] = useState<{name: string, content: string} | null>(null);
@@ -198,13 +199,7 @@ const ScriptView: React.FC<ScriptViewProps> = ({ onGenerate, isProcessing, setPr
           if (srtFile) {
               const blocks = parseSRT(srtFile.content);
               
-              let targetSecs = 12;
-              if (pace === 'frenetic') targetSecs = 4;
-              if (pace === 'dynamic') targetSecs = 7;
-              if (pace === 'slow') targetSecs = 20;
-              if (pace === 'super_slow') targetSecs = 35;
-
-              const grouped = groupSRTBlocks(blocks, targetSecs);
+              const grouped = groupSRTBlocks(blocks, manualTargetDuration);
               
               const scenesWithVisuals = await generateVisualsForScenes(grouped.map(g => ({
                   narration: g.text,

@@ -225,6 +225,17 @@ const ScenesView: React.FC<ScenesViewProps> = ({ scenes, setScenes, characters, 
       }
     };
 
+    const handleGenerateAllImagesSequentially = async () => {
+        setIsBulkGenerating(true);
+        for (const scene of scenes) {
+            if (!scene.imageUrl) {
+                await handleGenerateImage(scene);
+            }
+        }
+        setIsBulkGenerating(false);
+        playSuccessSound();
+    };
+
     const handleMagicGenerate = async () => {
         setIsBulkGenerating(true);
         const tasks: (() => Promise<void>)[] = [];
@@ -270,6 +281,11 @@ const ScenesView: React.FC<ScenesViewProps> = ({ scenes, setScenes, characters, 
                             <span>Veo</span>
                         </button>
                       </div>
+
+                      <button onClick={handleGenerateAllImagesSequentially} disabled={isBulkGenerating} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider shadow-lg transition-all ${isBulkGenerating ? 'bg-[#333] text-gray-500' : 'bg-white text-black hover:bg-gray-200'}`}>
+                          {isBulkGenerating ? <Loader2 size={14} className="animate-spin"/> : <ImageIcon size={14} />}
+                          <span>Gerar Imagens</span>
+                      </button>
 
                       <button onClick={handleMagicGenerate} disabled={isBulkGenerating} className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-wider shadow-lg transition-all ${isBulkGenerating ? 'bg-[#333] text-gray-500' : 'bg-white text-black hover:bg-gray-200'}`}>
                           {isBulkGenerating ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14} />}

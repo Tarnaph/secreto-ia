@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { PanelRightClose, PanelRightOpen, MonitorPlay, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { PanelRightClose, PanelRightOpen, MonitorPlay, Zap, Download, Upload } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ScriptView from './components/ScriptView';
 import ScenesView from './components/ScenesView';
@@ -29,13 +29,228 @@ const App: React.FC = () => {
   // Preview Toggle State
   const [showPreview, setShowPreview] = useState(true);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
   const handleScriptGenerated = (newScenes: Scene[]) => {
     setScenes(newScenes);
     setCurrentView(AppView.SCENES);
   };
 
+  const handleExportProject = async () => {
+    try {
+      setIsExporting(true);
+      const JSZip = (window as any).JSZip;
+      if (!JSZip) {
+        alert("A biblioteca JSZip ainda não foi carregada. Tente novamente em alguns segundos.");
+        return;
+      }
+      const zip = new JSZip();
+      
+      const projectData = {
+        scenes: JSON.parse(JSON.stringify(scenes)),
+        characters: JSON.parse(JSON.stringify(characters)),
+        backgroundMusic,
+        musicVolume,
+        selectedVoice,
+        aspectRatio,
+        imageStyle,
+        imageModel,
+        subtitleStyle,
+        showSubtitles,
+        subtitlePosition
+      };
+
+      // Process scenes
+      let srtContent = '';
+      let imgPromptsContent = '';
+      let veoPromptsContent = '';
+      let currentSrtTime = 0; // seconds
+
+      const formatSrtTime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        const ms = Math.floor((seconds % 1) * 1000);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+      };
+
+      for (let i = 0; i < projectData.scenes.length; i++) {
+        const scene = projectData.scenes[i];
+        
+        // Handle audio
+        if (scene.audioUrl) {
+          if (scene.audioUrl.startsWith('blob:')) {
+            const res = await fetch(scene.audioUrl);
+            const blob = await res.blob();
+            const filename = `audio_${i + 1}.wav`;
+            zip.file(filename, blob);
+            scene.audioUrl = `local://${filename}`;
+          }
+        }
+        
+        // Handle image
+        if (scene.imageUrl) {
+          if (scene.imageUrl.startsWith('blob:')) {
+            const res = await fetch(scene.imageUrl);
+            const blob = await res.blob();
+            const filename = `image_${i + 1}.png`;
+            zip.file(filename, blob);
+            scene.imageUrl = `local://${filename}`;
+          } else if (scene.imageUrl.startsWith('data:')) {
+            const res = await fetch(scene.imageUrl);
+            const blob = await res.blob();
+            const filename = `image_${i + 1}.png`;
+            zip.file(filename, blob);
+            scene.imageUrl = `local://${filename}`;
+          }
+        }
+
+        // Build SRT
+        const duration = scene.audioDuration || scene.manualDuration || 5;
+        const startTimeStr = formatSrtTime(currentSrtTime);
+        const endTimeStr = formatSrtTime(currentSrtTime + duration);
+        
+        srtContent += `${i + 1}\n${startTimeStr} --> ${endTimeStr}\n${scene.narration}\n\n`;
+        
+        // Add 30 seconds between scenes
+        currentSrtTime += duration + 30;
+
+        // Build Image Prompts
+        imgPromptsContent += `[Cena ${i + 1}]\n${scene.visualPrompt}\n\n`;
+
+        // Build Veo Prompts
+        if (scene.videoPrompt) {
+            veoPromptsContent += `[Cena ${i + 1}]\n${scene.videoPrompt}\n\n`;
+        }
+      }
+
+      // Process characters
+      for (let i = 0; i < projectData.characters.length; i++) {
+        const char = projectData.characters[i];
+        if (char.imageData) {
+          if (char.imageData.startsWith('data:') || char.imageData.startsWith('blob:')) {
+            const res = await fetch(char.imageData);
+            const blob = await res.blob();
+            const filename = `char_${char.id}.png`;
+            zip.file(filename, blob);
+            char.imageData = `local://${filename}`;
+          }
+        }
+      }
+
+      zip.file("project.json", JSON.stringify(projectData, null, 2));
+      zip.file("legendas.srt", srtContent);
+      zip.file("prompts_imagem.txt", imgPromptsContent);
+      if (veoPromptsContent) {
+          zip.file("prompts_veo.txt", veoPromptsContent);
+      }
+      
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'algoritmo-secreto-project.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export failed", error);
+      alert("Erro ao exportar projeto.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      const JSZip = (window as any).JSZip;
+      if (!JSZip) {
+        alert("A biblioteca JSZip ainda não foi carregada. Tente novamente em alguns segundos.");
+        return;
+      }
+      
+      const zip = await JSZip.loadAsync(file);
+      const projectJsonFile = zip.file("project.json");
+      if (!projectJsonFile) throw new Error("project.json not found in zip");
+      
+      const projectJsonStr = await projectJsonFile.async("string");
+      const projectData = JSON.parse(projectJsonStr);
+      
+      // Restore scenes
+      if (projectData.scenes) {
+        for (const scene of projectData.scenes) {
+          if (scene.audioUrl && scene.audioUrl.startsWith('local://')) {
+            const filename = scene.audioUrl.replace('local://', '');
+            const fileData = zip.file(filename);
+            if (fileData) {
+              const blob = await fileData.async("blob");
+              scene.audioUrl = URL.createObjectURL(blob);
+            }
+          }
+          if (scene.imageUrl && scene.imageUrl.startsWith('local://')) {
+            const filename = scene.imageUrl.replace('local://', '');
+            const fileData = zip.file(filename);
+            if (fileData) {
+              const blob = await fileData.async("blob");
+              scene.imageUrl = URL.createObjectURL(blob);
+            }
+          }
+        }
+        setScenes(projectData.scenes);
+      }
+      
+      // Restore characters
+      if (projectData.characters) {
+        for (const char of projectData.characters) {
+          if (char.imageData && char.imageData.startsWith('local://')) {
+            const filename = char.imageData.replace('local://', '');
+            const fileData = zip.file(filename);
+            if (fileData) {
+              const base64 = await fileData.async("base64");
+              char.imageData = `data:image/png;base64,${base64}`;
+            }
+          }
+        }
+        setCharacters(projectData.characters);
+      }
+      
+      if (projectData.backgroundMusic !== undefined) setBackgroundMusic(projectData.backgroundMusic);
+      if (projectData.musicVolume !== undefined) setMusicVolume(projectData.musicVolume);
+      if (projectData.selectedVoice) setSelectedVoice(projectData.selectedVoice);
+      if (projectData.aspectRatio) setAspectRatio(projectData.aspectRatio);
+      if (projectData.imageStyle) setImageStyle(projectData.imageStyle);
+      if (projectData.imageModel) setImageModel(projectData.imageModel);
+      if (projectData.subtitleStyle) setSubtitleStyle(projectData.subtitleStyle);
+      if (projectData.showSubtitles !== undefined) setShowSubtitles(projectData.showSubtitles);
+      if (projectData.subtitlePosition) setSubtitlePosition(projectData.subtitlePosition);
+      
+      setCurrentView(AppView.SCENES);
+    } catch (error) {
+      console.error("Failed to import project", error);
+      alert("Erro ao importar projeto. Arquivo inválido ou corrompido.");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="flex h-screen bg-black text-white font-sans overflow-hidden">
+      {(isExporting || isImporting) && (
+        <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+           <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+              <p className="text-white font-medium tracking-widest uppercase text-sm">
+                {isExporting ? 'Exportando Projeto...' : 'Importando Projeto...'}
+              </p>
+           </div>
+        </div>
+      )}
       <Sidebar 
         currentView={currentView} 
         onChangeView={setCurrentView} 
@@ -65,6 +280,30 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
+                      title="Importar Projeto"
+                    >
+                      <Upload size={14} />
+                      <span className="hidden sm:inline">Importar</span>
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleImportProject} 
+                      accept=".zip" 
+                      className="hidden" 
+                    />
+                    <button 
+                      onClick={handleExportProject}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
+                      title="Exportar Projeto"
+                    >
+                      <Download size={14} />
+                      <span className="hidden sm:inline">Exportar</span>
+                    </button>
+
                     <div className="relative group">
                       <select 
                           value={selectedVoice}

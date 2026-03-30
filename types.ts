@@ -69,7 +69,9 @@ export enum ImageStyle {
   FINE_ART_RELIGIOUS_SPLASH = 'Fine Art Religious Splash',
   SPIRITUAL_CODE_THUMBNAIL = 'Código Espiritual Thumbnail',
   SACRED_TAROT_LINEART = 'Sacred Tarot Lineart',
-  DARK_FANTASY_JUNJI = 'Dark fantasy ink illustration in the style of Junji, preto e branco, muito contraste, terror,'
+  DARK_FANTASY_JUNJI = 'Dark fantasy ink illustration in the style of Junji, preto e branco, muito contraste, terror,',
+  RISOGRAPH_PUNK = 'Risograph Punk',
+  ROBLOX = 'Roblox'
 }
 
 export type ImageModelType = 'standard' | 'pro';

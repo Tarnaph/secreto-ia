@@ -149,7 +149,8 @@ export const STYLE_DEFINITIONS: Record<string, string> = {
     [ImageStyle.FINE_ART_RELIGIOUS_SPLASH]: "Hyper-realistic photography in fine art dark style, dramatic portrait of a religious figure in a somber ancient stone and mist environment, cinematic lighting with single candle rays creating a golden halo, asymmetric composition, shallow depth of field. MASKED COLOR SPLASH: Scene is mostly desaturated cold blue/gray tones with deep gritty textures, except for ONE SINGLE ULTRA-VIBRANT COLOR ELEMENT (like a glowing blood-red item) that pops intensely, extreme contrast, deep shadows, 8k, professional studio quality, subtle smoke effects, style of Gregory Crewdson",
     [ImageStyle.SPIRITUAL_CODE_THUMBNAIL]: "Cinematic digital artwork in hyper-realistic fantasy style, dramatic dark spiritual theme, high-impact composition, extremely detailed textures, volumetric god rays, rim lighting, high contrast shadows, mystical dark fantasy atmosphere, 8k resolution. VIBRANT MASKED COLOR: Intense glowing mystical portals in purple and gold, divine light emanating with ethereal glow, bold highlights, sharp focus, masterwork quality, cinematic 16:9 aspect ratio, style of Gregory Crewdson, NO TEXT OR LOGOS",
     [ImageStyle.SACRED_TAROT_LINEART]: "Intricate lineart digital tarot card artwork, warm sepia and gold color palette, ethereal spiritual aesthetic, sacred geometry patterns, radiant sunburst effects, detailed ink line work, ornate borders with mystical symbols, high contrast chiaroscuro, volumetric divine rays, gold leaf accents, fine art illustration style, 8k resolution, cinematic 16:9 composition, NO TEXT OR LETTERS",
-    [ImageStyle.DARK_FANTASY_JUNJI]: "Dark fantasy ink illustration in the style of Junji Ito, black and white, extreme contrast, horror, highly detailed line art, macabre, unsettling atmosphere, crosshatching, grotesque elements, psychological terror, 8k resolution"
+    [ImageStyle.DARK_FANTASY_JUNJI]: "Dark fantasy ink illustration in the style of Junji Ito, black and white, extreme contrast, horror, highly detailed line art, macabre, unsettling atmosphere, crosshatching, grotesque elements, psychological terror, 8k resolution",
+    [ImageStyle.RISOGRAPH_PUNK]: "Risograph punk art style, vibrant neon pink and strong green flat colors, grainy print texture, visible halftone dots, collage style with cut-out faces, central character screaming, surrounded by explosive shapes, punk show poster aesthetic, slight color layer misalignment, cheap printing imperfections, aggressive, raw, underground atmosphere, high contrast, 8k resolution, no text"
 };
 
 const TECH_BASE = "hyper-realistic, 8k, cinematic lighting, masterwork, intricate textures, sharp focus, high detail, photorealistic";
@@ -260,14 +261,14 @@ export const formatScript = async (
     const narrations: { narration: string }[] = await retryOperation(async () => {
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview',
-            contents: `Divida o texto em cenas curtas e descritivas: "${text}". Retorne JSON array com "narration". IMPORTANTE: Cada "narration" deve ter no máximo 499 caracteres.`,
+            contents: `Divida o texto em cenas curtas e descritivas: "${text}". Retorne JSON array com "narration". IMPORTANTE: Cada "narration" deve ter no máximo 499 caracteres. REGRA DE OURO: NUNCA RESUMA O TEXTO QUE TE MANDEI. Mantenha o texto original intacto, apenas divida-o em partes menores.`,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.ARRAY,
                     items: {
                         type: Type.OBJECT,
-                        properties: { narration: { type: Type.STRING, description: "Texto da narração. MÁXIMO 499 caracteres." } },
+                        properties: { narration: { type: Type.STRING, description: "Texto da narração. MÁXIMO 499 caracteres. NÃO RESUMA O TEXTO ORIGINAL." } },
                         required: ["narration"]
                     }
                 }
